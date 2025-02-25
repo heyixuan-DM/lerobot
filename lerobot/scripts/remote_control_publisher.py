@@ -1,43 +1,56 @@
 import sys
 import rclpy
 from rclpy.node import Node
-from std_msgs.msg import String
 import numpy as np
 from std_msgs.msg import Float32MultiArray
-from lerobot.common.utils.utils import init_hydra_config
-from lerobot.common.robot_devices.robots.factory import make_robot
-from lerobot.common.utils.utils import init_hydra_config, init_logging
+import logging
+
+from dataclasses import asdict
+from pprint import pformat
+from lerobot.common.robot_devices.robots.utils import make_robot_from_config
+from lerobot.common.robot_devices.control_configs import ControlPipelineConfig
+from lerobot.common.utils.utils import init_logging
+from lerobot.configs import parser
 
 class TeleOperateObj(Node):
-    def __init__(self, robot_path, fps):
+    def __init__(self, robot, fps):
         super().__init__('leader_arm_publisher')
-        self.robot_cfg = init_hydra_config(robot_path)
-        self.robot = make_robot(self.robot_cfg)
+        self.robot = robot
         if not self.robot.is_connected:
             self.robot.connect()
-        self.publisher = self.create_publisher(Float32MultiArray, '/leader_arm/state', 30)
+        self.publisher_left = self.create_publisher(Float32MultiArray, '/leader_left/state', 30)
+        self.publisher_right = self.create_publisher(Float32MultiArray, '/leader_right/state', 30)
         timer_period = 1.0 / fps  # seconds
         self.timer = self.create_timer(timer_period, self.timer_callback)
     def timer_callback(self):
-        leader_pos = None
-        for name in self.robot.leader_arms:
-            leader_pos=self.robot.leader_arms[name].read("Present_Position")
-            break
+        leader_pos_left=self.robot.leader_arms["left"].read("Present_Position")
+        leader_pos_right=self.robot.leader_arms["right"].read("Present_Position")
 
-        msg = Float32MultiArray()
-        msg.data = leader_pos.tolist()
-        self.publisher.publish(msg)
+        msg_left = Float32MultiArray()
+        msg_right = Float32MultiArray()
+        msg_left.data = leader_pos_left.tolist()
+        msg_right.data = leader_pos_right.tolist()
+        self.publisher_left.publish(msg_left)
+        self.publisher_right.publish(msg_right)
     def shutdown(self):
         if self.robot.is_connected:
         # Disconnect manually to avoid a "Core dump" during process
         # termination due to camera threads not properly exiting.
             self.robot.disconnect()
 
+@parser.wrap()
+def parse_arg(cfg: ControlPipelineConfig):
+    init_logging()
+    logging.info(pformat(asdict(cfg)))
+
+    robot = make_robot_from_config(cfg.robot)
+    fps = cfg.control.fps
+    return robot, fps
+
 if __name__ == "__main__":
     rclpy.init()
-    robot_path = sys.argv[1]
-    fps = int(sys.argv[2])
-    obj = TeleOperateObj(robot_path, fps)
+    robot, fps = parse_arg()
+    obj = TeleOperateObj(robot, fps)
     try:
         rclpy.spin(obj)
     except KeyboardInterrupt:
