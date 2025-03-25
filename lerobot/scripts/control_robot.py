@@ -227,10 +227,12 @@ def calibrate(robot: Robot, cfg: CalibrateControlConfig):
 
 @safe_disconnect
 def teleoperate(robot: Robot, cfg: TeleoperateControlConfig):
+    listener, events = init_keyboard_listener()
     control_loop(
         robot,
         control_time_s=cfg.teleop_time_s,
         fps=cfg.fps,
+        events=events,
         teleoperate=True,
         display_cameras=cfg.display_cameras,
     )

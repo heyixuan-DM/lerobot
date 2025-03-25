@@ -166,6 +166,7 @@ class ManipulatorRobot:
         self.cameras = make_cameras_from_configs(self.config.cameras)
         self.is_connected = False
         self.logs = {}
+        self.fold_target = None
 
     def get_motor_names(self, arm: dict[str, MotorsBus]) -> list:
         return [f"{arm}_{motor}" for arm, bus in arm.items() for motor in bus.motors]
@@ -443,20 +444,27 @@ class ManipulatorRobot:
             self.follower_arms[name].write("Acceleration", 254)
 
     def teleop_step(
-        self, record_data=False
-    ) -> None | tuple[dict[str, torch.Tensor], dict[str, torch.Tensor]]:
+        self, record_data=False, fold=False
+    ) -> None | tuple[dict[str, torch.Tensor], dict[str, torch.Tensor], bool]:
         if not self.is_connected:
             raise RobotDeviceNotConnectedError(
                 "ManipulatorRobot is not connected. You need to run `robot.connect()`."
             )
-
+        fold_done = (not fold)
         # Prepare to assign the position of the leader to the follower
         leader_pos = {}
-        for name in self.leader_arms:
+        for name in self.follower_arms:
             before_lread_t = time.perf_counter()
-            leader_pos[name] = self.leader_arms[name].read("Present_Position")
+            leader_pos[name] = self.follower_arms[name].read("Present_Position")
+            
+            if name == 'right':
+                if fold:
+                    if self.fold_target is None:
+                        self.fold_target = (180 if round(leader_pos[name][6])<5 else 0)
+                    leader_pos[name][6]=self.fold_target
             leader_pos[name] = torch.from_numpy(leader_pos[name])
-            self.logs[f"read_leader_{name}_pos_dt_s"] = time.perf_counter() - before_lread_t
+
+            # self.logs[f"read_leader_{name}_pos_dt_s"] = time.perf_counter() - before_lread_t
 
         # Send goal position to the follower
         follower_goal_pos = {}
@@ -476,7 +484,14 @@ class ManipulatorRobot:
 
             goal_pos = goal_pos.numpy().astype(np.int32)
             self.follower_arms[name].write("Goal_Position", goal_pos)
-            self.logs[f"write_follower_{name}_goal_pos_dt_s"] = time.perf_counter() - before_fwrite_t
+            debug_pos = self.follower_arms[name].read("Present_Position")
+            fold_motor = round(debug_pos[6])
+            print("fold_motor, goal_pos[6]", fold_motor, goal_pos[6])
+            if name == "right" and (abs(fold_motor - goal_pos[6]) < 2) and fold:
+                fold_done = True
+                self.fold_target = None
+
+            # self.logs[f"write_follower_{name}_goal_pos_dt_s"] = time.perf_counter() - before_fwrite_t
 
         # Early exit when recording data is not requested
         if not record_data:
@@ -489,7 +504,7 @@ class ManipulatorRobot:
             before_fread_t = time.perf_counter()
             follower_pos[name] = self.follower_arms[name].read("Present_Position")
             follower_pos[name] = torch.from_numpy(follower_pos[name])
-            self.logs[f"read_follower_{name}_pos_dt_s"] = time.perf_counter() - before_fread_t
+            # self.logs[f"read_follower_{name}_pos_dt_s"] = time.perf_counter() - before_fread_t
 
         # Create state by concatenating follower current position
         state = []
@@ -521,7 +536,7 @@ class ManipulatorRobot:
         for name in self.cameras:
             obs_dict[f"observation.images.{name}"] = images[name]
 
-        return obs_dict, action_dict
+        return obs_dict, action_dict, fold_done
 
     def capture_observation(self):
         """The returned observations do not have a batch dimension."""
