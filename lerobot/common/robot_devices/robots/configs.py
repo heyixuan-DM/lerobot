@@ -443,7 +443,7 @@ class So100RobotConfig(ManipulatorRobotConfig):
     leader_arms: dict[str, MotorsBusConfig] = field(
         default_factory=lambda: {
             "left": FeetechMotorsBusConfig(
-                port="/dev/ttyACM5",
+                port="/dev/ttyACM4",
                 motors={
                     # name: (index, model)
                     "shoulder_pan": [1, "sts3215"],
@@ -455,7 +455,7 @@ class So100RobotConfig(ManipulatorRobotConfig):
                 },
             ),
             "right": FeetechMotorsBusConfig(
-                port="/dev/ttyACM4",
+                port="/dev/ttyACM3",
                 motors={
                     # name: (index, model)
                     "shoulder_pan": [1, "sts3215"],
@@ -472,7 +472,7 @@ class So100RobotConfig(ManipulatorRobotConfig):
     follower_arms: dict[str, MotorsBusConfig] = field(
         default_factory=lambda: {
             "left": FeetechMotorsBusConfig(
-                port="/dev/ttyACM2",
+                port="/dev/ttyACM5",
                 motors={
                     # name: (index, model)
                     "shoulder_pan": [1, "sts3215"],
@@ -484,7 +484,7 @@ class So100RobotConfig(ManipulatorRobotConfig):
                 },
             ),
             "right": FeetechMotorsBusConfig(
-                port="/dev/ttyACM3",
+                port="/dev/ttyACM2",
                 motors={
                     # name: (index, model)
                     "shoulder_pan": [1, "sts3215"],

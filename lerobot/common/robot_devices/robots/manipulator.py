@@ -267,6 +267,9 @@ class ManipulatorRobot:
         for name in self.follower_arms:
             print(f"Activating torque on {name} follower arm.")
             self.follower_arms[name].write("Torque_Enable", 1)
+            self.follower_arms[name].write("D_Coefficient", 16)
+            self.follower_arms[name].write("Torque_Limit", 500)
+            self.follower_arms[name].write("Protective_Torque", 10)
 
         if self.config.gripper_open_degree is not None:
             if self.robot_type not in ["koch", "koch_bimanual"]:
