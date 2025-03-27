@@ -136,7 +136,9 @@ def init_keyboard_listener():
     events["exit_early"] = False
     events["rerecord_episode"] = False
     events["stop_recording"] = False
-    events["fold"] = False
+    events["left_fold"] = False
+    events["right_fold"] = False
+    events["middle_fold"] = False
 
     if is_headless():
         logging.warning(
@@ -162,8 +164,14 @@ def init_keyboard_listener():
                 events["stop_recording"] = True
                 events["exit_early"] = True
             elif key == keyboard.Key.space:
-                print("Space key pressed. fold once")
-                events["fold"] = True
+                print("Space key pressed. left_fold once")
+                events["left_fold"] = True
+            elif key == keyboard.Key.shift:
+                print("Shift key pressed. middle_fold once")
+                events["middle_fold"] = True
+            elif key == keyboard.Key.enter:
+                print("Ctrl key pressed. right_fold once")
+                events["right_fold"] = True
         except Exception as e:
             print(f"Error handling key press: {e}")
 
@@ -231,7 +239,7 @@ def control_loop(
         robot.connect()
 
     if events is None:
-        events = {"exit_early": False, "fold": False}
+        events = {"exit_early": False, "left_fold": False, "right_fold": False, "middle_fold": False}
 
     if control_time_s is None:
         control_time_s = float("inf")
@@ -251,9 +259,8 @@ def control_loop(
         start_loop_t = time.perf_counter()
 
         if teleoperate:
-            observation, action, fold_done = robot.teleop_step(record_data=True, fold=events["fold"])
-            print("fold_done", fold_done)
-            events["fold"] = (not fold_done)
+            observation, action, fold_done = robot.teleop_step(record_data=True, events=events)
+            # print("fold_done", fold_done)
         else:
             observation = robot.capture_observation()
 

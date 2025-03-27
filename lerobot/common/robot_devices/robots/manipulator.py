@@ -166,7 +166,9 @@ class ManipulatorRobot:
         self.cameras = make_cameras_from_configs(self.config.cameras)
         self.is_connected = False
         self.logs = {}
-        self.fold_target = None
+        self.left_fold_target = None
+        self.right_fold_target = None
+        self.middle_fold_target = None
 
     def get_motor_names(self, arm: dict[str, MotorsBus]) -> list:
         return [f"{arm}_{motor}" for arm, bus in arm.items() for motor in bus.motors]
@@ -185,8 +187,8 @@ class ManipulatorRobot:
 
     @property
     def motor_features(self) -> dict:
-        action_names = self.get_motor_names(self.leader_arms)
-        state_names = self.get_motor_names(self.leader_arms)
+        action_names = self.get_motor_names(self.follower_arms)
+        state_names = self.get_motor_names(self.follower_arms)
         return {
             "action": {
                 "dtype": "float32",
@@ -444,24 +446,48 @@ class ManipulatorRobot:
             self.follower_arms[name].write("Acceleration", 254)
 
     def teleop_step(
-        self, record_data=False, fold=False
+        self, record_data=False, events=None
     ) -> None | tuple[dict[str, torch.Tensor], dict[str, torch.Tensor], bool]:
         if not self.is_connected:
             raise RobotDeviceNotConnectedError(
                 "ManipulatorRobot is not connected. You need to run `robot.connect()`."
             )
-        fold_done = (not fold)
+        fold_done = (not(events["left_fold"] or events["right_fold"] or events["middle_fold"]))
+        # print("fold", events["left_fold"] , events["right_fold"] , events["middle_fold"])
         # Prepare to assign the position of the leader to the follower
         leader_pos = {}
-        for name in self.follower_arms:
+        for name in self.leader_arms:
             before_lread_t = time.perf_counter()
-            leader_pos[name] = self.follower_arms[name].read("Present_Position")
+            leader_pos[name] = self.leader_arms[name].read("Present_Position")
+            raw_pos = self.follower_arms[name].read("Present_Position")
+
+            # print("raw_pos",raw_pos)
+            # return
             
-            if name == 'right':
-                if fold:
-                    if self.fold_target is None:
-                        self.fold_target = (180 if round(leader_pos[name][6])<5 else 0)
-                    leader_pos[name][6]=self.fold_target
+            if name == 'left':
+                last_pos = raw_pos[6]
+                if events["left_fold"] and raw_pos[0]>90:
+                    if self.left_fold_target is None:
+                        self.left_fold_target = (np.float32(150) if round(last_pos+30)<20 else np.float32(-30))
+                    last_pos = self.left_fold_target
+                leader_pos[name]=np.append(leader_pos[name], last_pos)
+                # print("leader_pos",type(leader_pos[name][6]))
+
+            elif name == 'right':
+                last_two_pos = np.array([raw_pos[6], raw_pos[7]])
+                if events["right_fold"] and raw_pos[0]<-90:
+                    
+                    if self.right_fold_target is None:
+                        self.right_fold_target = (np.float32(175) if round(raw_pos[6]+5)<20 else np.float32(-5))
+                    last_two_pos = np.array([self.right_fold_target, raw_pos[7]])
+                
+                elif events["middle_fold"]:
+                    if self.middle_fold_target is None:
+                        self.middle_fold_target = (np.float32(180) if round(raw_pos[7])<20 else np.float32(0))
+                    last_two_pos = np.array([raw_pos[6],self.middle_fold_target])
+                leader_pos[name]=np.concatenate([leader_pos[name], last_two_pos])
+                # print("leader_pos",type(leader_pos[name][6]), type(leader_pos[name][7]))
+            
             leader_pos[name] = torch.from_numpy(leader_pos[name])
 
             # self.logs[f"read_leader_{name}_pos_dt_s"] = time.perf_counter() - before_lread_t
@@ -485,11 +511,22 @@ class ManipulatorRobot:
             goal_pos = goal_pos.numpy().astype(np.int32)
             self.follower_arms[name].write("Goal_Position", goal_pos)
             debug_pos = self.follower_arms[name].read("Present_Position")
-            fold_motor = round(debug_pos[6])
-            print("fold_motor, goal_pos[6]", fold_motor, goal_pos[6])
-            if name == "right" and (abs(fold_motor - goal_pos[6]) < 2) and fold:
+            if name == "left" and events["left_fold"] and (abs(round(debug_pos[6]) - goal_pos[6]) < 5):
+                print("left_fold_motor, goal_pos[6]", debug_pos[6], goal_pos[6])
                 fold_done = True
-                self.fold_target = None
+                self.left_fold_target = None
+                events["left_fold"] = False
+            elif name == "right":
+                if events["right_fold"] and (abs(round(debug_pos[6]) - goal_pos[6]) < 5):
+                    print("right_fold_motor, goal_pos[6]", debug_pos[6], goal_pos[6])
+                    fold_done = True
+                    self.right_fold_target = None
+                    events["right_fold"] = False
+                elif events["middle_fold"] and (abs(round(debug_pos[7]) - goal_pos[7]) < 5):
+                    print("middle_fold_motor, goal_pos[7]", debug_pos[7], goal_pos[7])
+                    fold_done = True
+                    self.middle_fold_target = None
+                    events["middle_fold"] = False
 
             # self.logs[f"write_follower_{name}_goal_pos_dt_s"] = time.perf_counter() - before_fwrite_t
 

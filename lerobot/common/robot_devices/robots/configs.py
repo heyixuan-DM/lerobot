@@ -443,7 +443,7 @@ class So100RobotConfig(ManipulatorRobotConfig):
     leader_arms: dict[str, MotorsBusConfig] = field(
         default_factory=lambda: {
             "left": FeetechMotorsBusConfig(
-                port="/dev/ttyACM5",
+                port="/dev/ttyACM4",
                 motors={
                     # name: (index, model)
                     "shoulder_pan": [1, "sts3215"],
@@ -455,7 +455,7 @@ class So100RobotConfig(ManipulatorRobotConfig):
                 },
             ),
             "right": FeetechMotorsBusConfig(
-                port="/dev/ttyACM4",
+                port="/dev/ttyACM3",
                 motors={
                     # name: (index, model)
                     "shoulder_pan": [1, "sts3215"],
@@ -471,20 +471,8 @@ class So100RobotConfig(ManipulatorRobotConfig):
 
     follower_arms: dict[str, MotorsBusConfig] = field(
         default_factory=lambda: {
-            # "left": FeetechMotorsBusConfig(
-            #     port="/dev/ttyACM2",
-            #     motors={
-            #         # name: (index, model)
-            #         "shoulder_pan": [1, "sts3215"],
-            #         "shoulder_lift": [2, "sts3215"],
-            #         "elbow_flex": [3, "sts3215"],
-            #         "wrist_flex": [4, "sts3215"],
-            #         "wrist_roll": [5, "sts3215"],
-            #         "gripper": [6, "sts3215"],
-            #     },
-            # ),
-            "right": FeetechMotorsBusConfig(
-                port="/dev/ttyACM0",
+            "left": FeetechMotorsBusConfig(
+                port="/dev/ttyACM5",
                 motors={
                     # name: (index, model)
                     "shoulder_pan": [1, "sts3215"],
@@ -496,13 +484,33 @@ class So100RobotConfig(ManipulatorRobotConfig):
                     "folder": [7, "sts3215"],
                 },
             ),
+            "right": FeetechMotorsBusConfig(
+                port="/dev/ttyACM2",
+                motors={
+                    # name: (index, model)
+                    "shoulder_pan": [1, "sts3215"],
+                    "shoulder_lift": [2, "sts3215"],
+                    "elbow_flex": [3, "sts3215"],
+                    "wrist_flex": [4, "sts3215"],
+                    "wrist_roll": [5, "sts3215"],
+                    "gripper": [6, "sts3215"],
+                    "folder": [7, "sts3215"],
+                    "middle_folder": [8, "sts3215"],
+                },
+            ),
         }
     )
 
     cameras: dict[str, CameraConfig] = field(
         default_factory=lambda: {
-            "laptop": OpenCVCameraConfig(
-                camera_index=4,
+            "laptop_right": OpenCVCameraConfig(
+                camera_index=9,
+                fps=30,
+                width=640,
+                height=480,
+            ),
+            "laptop_left": OpenCVCameraConfig(
+                camera_index=5,
                 fps=30,
                 width=640,
                 height=480,
