@@ -554,6 +554,11 @@ class ManipulatorRobot:
         action = []
         for name in self.follower_arms:
             if name in follower_goal_pos:
+                if name == 'left':
+                    follower_goal_pos[name][6]=follower_pos[name][6]
+                elif name == 'right':
+                    follower_goal_pos[name][6]=follower_pos[name][6]
+                    follower_goal_pos[name][7]=follower_pos[name][7]
                 action.append(follower_goal_pos[name])
         action = torch.cat(action)
 
