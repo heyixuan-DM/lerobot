@@ -319,7 +319,10 @@ def record(
             dataset.clear_episode_buffer()
             continue
 
+        t = time.perf_counter()
         dataset.save_episode()
+        t_dt_s = time.perf_counter()-t
+        print("save episode", t_dt_s)
         recorded_episodes += 1
 
         if events["stop_recording"]:

@@ -170,6 +170,10 @@ class ManipulatorRobot:
     def get_motor_names(self, arm: dict[str, MotorsBus]) -> list:
         return [f"{arm}_{motor}" for arm, bus in arm.items() for motor in bus.motors]
 
+    def camera_keys(self)->list:
+        return [f"observation.images.{name}" for name in self.cameras]
+
+
     @property
     def camera_features(self) -> dict:
         cam_ft = {}

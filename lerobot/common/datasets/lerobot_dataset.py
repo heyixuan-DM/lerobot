@@ -784,7 +784,7 @@ class LeRobotDataset(torch.utils.data.Dataset):
                 image = image.cpu().numpy()
             write_image(image, fpath)
         else:
-            self.image_writer.save_image(image=image, fpath=fpath)
+            self.image_writer.save_image(image=image, video_key=fpath)
 
     def add_frame(self, frame: dict) -> None:
         """
@@ -824,9 +824,9 @@ class LeRobotDataset(torch.utils.data.Dataset):
                 img_path = self._get_image_file_path(
                     episode_index=self.episode_buffer["episode_index"], image_key=key, frame_index=frame_index
                 )
-                if frame_index == 0:
-                    img_path.parent.mkdir(parents=True, exist_ok=True)
-                self._save_image(frame[key], img_path)
+                # if frame_index == 0:
+                #     img_path.parent.mkdir(parents=True, exist_ok=True)
+                self._save_image(frame[key], key)
                 self.episode_buffer[key].append(str(img_path))
             else:
                 self.episode_buffer[key].append(frame[key])
@@ -894,11 +894,11 @@ class LeRobotDataset(torch.utils.data.Dataset):
             self.tolerance_s,
         )
 
-        video_files = list(self.root.rglob("*.mp4"))
-        assert len(video_files) == self.num_episodes * len(self.meta.video_keys)
+        # video_files = list(self.root.rglob("*.mp4"))
+        # assert len(video_files) == self.num_episodes * len(self.meta.video_keys)
 
-        parquet_files = list(self.root.rglob("*.parquet"))
-        assert len(parquet_files) == self.num_episodes
+        # parquet_files = list(self.root.rglob("*.parquet"))
+        # assert len(parquet_files) == self.num_episodes
 
         # delete images
         img_dir = self.root / "images"
@@ -931,7 +931,7 @@ class LeRobotDataset(torch.utils.data.Dataset):
         # Reset the buffer
         self.episode_buffer = self.create_episode_buffer()
 
-    def start_image_writer(self, num_processes: int = 0, num_threads: int = 4) -> None:
+    def start_image_writer(self, num_processes: int = 0, num_threads: int = 4, camera_keys: list = []) -> None:
         if isinstance(self.image_writer, AsyncImageWriter):
             logging.warning(
                 "You are starting a new AsyncImageWriter that is replacing an already existing one in the dataset."
@@ -939,7 +939,8 @@ class LeRobotDataset(torch.utils.data.Dataset):
 
         self.image_writer = AsyncImageWriter(
             num_processes=num_processes,
-            num_threads=num_threads,
+            num_threads=len(camera_keys),
+            camera_keys,
         )
 
     def stop_image_writer(self) -> None:
@@ -978,10 +979,10 @@ class LeRobotDataset(torch.utils.data.Dataset):
             if video_path.is_file():
                 # Skip if video is already encoded. Could be the case when resuming data recording.
                 continue
-            img_dir = self._get_image_file_path(
-                episode_index=episode_index, image_key=key, frame_index=0
-            ).parent
-            encode_video_frames(img_dir, video_path, self.fps, vcodec="libopenh264", overwrite=True)
+            # img_dir = self._get_image_file_path(
+            #     episode_index=episode_index, image_key=key, frame_index=0
+            # ).parent
+            # encode_video_frames(img_dir, video_path, self.fps, vcodec="libopenh264", overwrite=True)
         return video_paths
 
     @classmethod
@@ -1017,7 +1018,7 @@ class LeRobotDataset(torch.utils.data.Dataset):
         obj.image_writer = None
 
         if image_writer_processes or image_writer_threads:
-            obj.start_image_writer(image_writer_processes, image_writer_threads)
+            obj.start_image_writer(image_writer_processes, image_writer_threads, robot.camera_keys)
 
         # TODO(aliberts, rcadene, alexander-soare): Merge this with OnlineBuffer/DataBuffer
         obj.episode_buffer = obj.create_episode_buffer()
