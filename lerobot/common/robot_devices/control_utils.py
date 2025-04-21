@@ -242,6 +242,7 @@ def control_loop(
         raise ValueError(f"The dataset fps should be equal to requested fps ({dataset['fps']} != {fps}).")
 
     timestamp = 0
+    last_action = None
     start_episode_t = time.perf_counter()
     while timestamp < control_time_s:
         start_loop_t = time.perf_counter()
@@ -251,6 +252,12 @@ def control_loop(
         else:
             observation = robot.capture_observation()
 
+            if last_action is not None and abs(observation["observation.state"]-last_action).max() >= 0.6:
+                if fps is not None:
+                    dt_s = time.perf_counter() - start_loop_t
+                    busy_wait(1 / fps - dt_s)
+                continue
+
             if policy is not None:
                 pred_action = predict_action(
                     observation, policy, get_safe_torch_device(policy.config.device), policy.config.use_amp
@@ -259,6 +266,7 @@ def control_loop(
                 # so action actually sent is saved in the dataset.
                 action = robot.send_action(pred_action)
                 action = {"action": action}
+                last_action = action
 
         if dataset is not None:
             frame = {**observation, **action, "task": single_task}
