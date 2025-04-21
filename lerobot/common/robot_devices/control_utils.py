@@ -241,33 +241,35 @@ def control_loop(
     if dataset is not None and fps is not None and dataset.fps != fps:
         raise ValueError(f"The dataset fps should be equal to requested fps ({dataset['fps']} != {fps}).")
 
+    dataset_replay = LeRobotDataset("yixuan/foldi", root="", episodes=[1])
+    actions_replay = dataset.hf_dataset.select_columns("action")
+    total_num = dataset_replay.num_frames
     timestamp = 0
-    last_action = None
+    index_frame = 0
     start_episode_t = time.perf_counter()
     while timestamp < control_time_s:
         start_loop_t = time.perf_counter()
+        
+        if index_frame>=index_frame:
+            break
 
         if teleoperate:
             observation, action = robot.teleop_step(record_data=True)
         else:
             observation = robot.capture_observation()
+            action = actions_replay[index_frame]["action"]
+            action = robot.send_action(action)
+            action = {"action": action}
 
-            if last_action is not None and abs(observation["observation.state"]-last_action).max() >= 0.6:
-                if fps is not None:
-                    dt_s = time.perf_counter() - start_loop_t
-                    busy_wait(1 / fps - dt_s)
-                continue
-
-            if policy is not None:
-                pred_action = predict_action(
-                    observation, policy, get_safe_torch_device(policy.config.device), policy.config.use_amp
-                )
+            # if policy is not None:
+                # pred_action = predict_action(
+                #     observation, policy, get_safe_torch_device(policy.config.device), policy.config.use_amp
+                # )
                 # Action can eventually be clipped using `max_relative_target`,
                 # so action actually sent is saved in the dataset.
-                action = robot.send_action(pred_action)
-                action = {"action": action}
-                last_action = action
-
+                # action = robot.send_action(pred_action)
+                # action = {"action": action}
+        index_frame = index_frame + 1
         if dataset is not None:
             frame = {**observation, **action, "task": single_task}
             dataset.add_frame(frame)
