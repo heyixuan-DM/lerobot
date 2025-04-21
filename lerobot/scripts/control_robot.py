@@ -165,6 +165,7 @@ from lerobot.common.robot_devices.robots.utils import Robot, make_robot_from_con
 from lerobot.common.robot_devices.utils import busy_wait, safe_disconnect
 from lerobot.common.utils.utils import has_method, init_logging, log_say
 from lerobot.configs import parser
+from pathlib import Path
 
 ########################################################################################
 # Control modes
@@ -251,6 +252,7 @@ def record(
             dataset.start_image_writer(
                 num_processes=cfg.num_image_writer_processes,
                 num_threads=cfg.num_image_writer_threads_per_camera * len(robot.cameras),
+                camera_keys=robot.camera_keys,
             )
         sanity_check_dataset_robot_compatibility(dataset, robot, cfg.fps, cfg.video)
     else:
@@ -291,6 +293,15 @@ def record(
             break
 
         log_say(f"Recording episode {dataset.num_episodes}", cfg.play_sounds)
+
+        video_paths={}
+        for key in dataset.meta.video_keys:
+            video_path = dataset.root / dataset.meta.get_video_file_path(dataset.num_episodes, key)
+            video_path = Path(video_path)
+            video_path.parent.mkdir(parents=True, exist_ok=True)
+            video_paths[key] = str(video_path)
+        dataset.image_writer.reset_video_writer(video_paths)
+
         record_episode(
             robot=robot,
             dataset=dataset,
@@ -320,7 +331,7 @@ def record(
             continue
 
         t = time.perf_counter()
-        dataset.save_episode()
+        dataset.save_episode(video_paths=video_paths)
         t_dt_s = time.perf_counter()-t
         print("save episode", t_dt_s)
         recorded_episodes += 1

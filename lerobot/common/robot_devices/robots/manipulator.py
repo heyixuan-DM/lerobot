@@ -170,7 +170,8 @@ class ManipulatorRobot:
     def get_motor_names(self, arm: dict[str, MotorsBus]) -> list:
         return [f"{arm}_{motor}" for arm, bus in arm.items() for motor in bus.motors]
 
-    def camera_keys(self)->list:
+    @property
+    def camera_keys(self) -> list:
         return [f"observation.images.{name}" for name in self.cameras]
 
 
@@ -431,7 +432,8 @@ class ManipulatorRobot:
                 f"`gripper_open_degree` is set to {self.config.gripper_open_degree}, but None is expected for Aloha instead",
                 stacklevel=1,
             )
-
+    # 4,0,0
+    #16,0,8
     def set_so100_robot_preset(self):
         for name in self.follower_arms:
             # Mode=0 for Position Control

@@ -22,6 +22,7 @@ import numpy as np
 import PIL.Image
 import torch
 import cv2
+import os
 
 
 def safe_stop_image_writer(func):
@@ -82,14 +83,16 @@ def write_image(image: np.ndarray | PIL.Image.Image, fpath: Path):
         print(f"Error writing image {fpath}: {e}")
 
 
-def worker_thread_loop(queue: queue.Queue, video_writer: cv2.VideoWriter):
+def worker_thread_loop(camera_key: str, queue: queue.Queue, video_writer: cv2.VideoWriter | None):
     while True:
         item = queue.get()
         if item is None:
             queue.task_done()
             break
         image_array = item
-        video_writer.write(image_array)
+        if video_writer[camera_key] is not None:
+            image_array = cv2.cvtColor(image_array, cv2.COLOR_RGB2BGR)
+            video_writer[camera_key].write(image_array)
         queue.task_done()
 
 
@@ -119,7 +122,7 @@ class AsyncImageWriter:
     the number of threads. If it is still not stable, try to use 1 subprocess, or more.
     """
 
-    def __init__(self, num_processes: int = 0, num_threads: int = 1, camera_keys: list = []):
+    def __init__(self, num_processes: int = 0, num_threads: int = 1, camera_keys: list[str] = []):
         self.num_processes = num_processes
         self.num_threads = num_threads
         self.video_writers = {}
@@ -127,7 +130,7 @@ class AsyncImageWriter:
         self.threads = []
         self.processes = []
         self._stopped = False
-        fourcc = cv2.VideoWriter_fourcc(*'h264_nvenc')
+        self.fourcc = cv2.VideoWriter_fourcc(*'avc1')
 
         if num_threads <= 0 and num_processes <= 0:
             raise ValueError("Number of threads and processes must be greater than zero.")
@@ -136,8 +139,8 @@ class AsyncImageWriter:
             # Use threading
             for i in range(self.num_threads):
                 self.queue[camera_keys[i]]=queue.Queue()
-                self.video_writers[camera_keys[i]]=cv2.VideoWriter(f"{camera_keys[i]}.mp4", fourcc, 25, (640, 480))
-                t = threading.Thread(target=worker_thread_loop, args=(self.queue[camera_keys[i]],))
+                self.video_writers[camera_keys[i]]=None
+                t = threading.Thread(target=worker_thread_loop, args=(camera_keys[i], self.queue[camera_keys[i]], self.video_writers,))
                 t.daemon = True
                 t.start()
                 self.threads.append(t)
@@ -149,6 +152,11 @@ class AsyncImageWriter:
                 p.daemon = True
                 p.start()
                 self.processes.append(p)
+
+    def reset_video_writer(self, video_path: dict):
+        # print("video_path", video_path)
+        for k in video_path:
+            self.video_writers[k] = cv2.VideoWriter(video_path[k], cv2.CAP_FFMPEG, self.fourcc, 25, (640, 480))
 
     def save_image(self, image: torch.Tensor | np.ndarray | PIL.Image.Image, video_key: str):
         if isinstance(image, torch.Tensor):
@@ -162,6 +170,7 @@ class AsyncImageWriter:
             self.queue[k].join()
         for k in self.video_writers:
             self.video_writers[k].release()
+            self.video_writers[k] = None
 
     def stop(self):
         if self._stopped:

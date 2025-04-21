@@ -821,19 +821,19 @@ class LeRobotDataset(torch.utils.data.Dataset):
                 )
 
             if self.features[key]["dtype"] in ["image", "video"]:
-                img_path = self._get_image_file_path(
-                    episode_index=self.episode_buffer["episode_index"], image_key=key, frame_index=frame_index
-                )
+                # img_path = self._get_image_file_path(
+                #     episode_index=self.episode_buffer["episode_index"], image_key=key, frame_index=frame_index
+                # )
                 # if frame_index == 0:
                 #     img_path.parent.mkdir(parents=True, exist_ok=True)
                 self._save_image(frame[key], key)
-                self.episode_buffer[key].append(str(img_path))
+                self.episode_buffer[key]=frame_index+1
             else:
                 self.episode_buffer[key].append(frame[key])
 
         self.episode_buffer["size"] += 1
 
-    def save_episode(self, episode_data: dict | None = None) -> None:
+    def save_episode(self, episode_data: dict | None = None, video_paths: dict | None = None) -> None:
         """
         This will save to disk the current episode in self.episode_buffer.
 
@@ -877,7 +877,7 @@ class LeRobotDataset(torch.utils.data.Dataset):
         ep_stats = compute_episode_stats(episode_buffer, self.features)
 
         if len(self.meta.video_keys) > 0:
-            video_paths = self.encode_episode_videos(episode_index)
+            # video_paths = self.encode_episode_videos(episode_index)
             for key in self.meta.video_keys:
                 episode_buffer[key] = video_paths[key]
 
@@ -931,16 +931,18 @@ class LeRobotDataset(torch.utils.data.Dataset):
         # Reset the buffer
         self.episode_buffer = self.create_episode_buffer()
 
-    def start_image_writer(self, num_processes: int = 0, num_threads: int = 4, camera_keys: list = []) -> None:
+    def start_image_writer(self, num_processes: int = 0, num_threads: int = 4, camera_keys: list[str] = []) -> None:
         if isinstance(self.image_writer, AsyncImageWriter):
             logging.warning(
                 "You are starting a new AsyncImageWriter that is replacing an already existing one in the dataset."
             )
 
+        num_threads = len(camera_keys)
+
         self.image_writer = AsyncImageWriter(
             num_processes=num_processes,
-            num_threads=len(camera_keys),
-            camera_keys,
+            num_threads=num_threads,
+            camera_keys=camera_keys,
         )
 
     def stop_image_writer(self) -> None:
