@@ -56,12 +56,12 @@ class LeKiwi(Robot):
             port=self.config.port,
             motors={
                 # arm
-                "arm_shoulder_pan": Motor(1, "sts3215", norm_mode_body),
-                "arm_shoulder_lift": Motor(2, "sts3215", norm_mode_body),
-                "arm_elbow_flex": Motor(3, "sts3215", norm_mode_body),
-                "arm_wrist_flex": Motor(4, "sts3215", norm_mode_body),
-                "arm_wrist_roll": Motor(5, "sts3215", norm_mode_body),
-                "arm_gripper": Motor(6, "sts3215", MotorNormMode.RANGE_0_100),
+                # "arm_shoulder_pan": Motor(1, "sts3215", norm_mode_body),
+                # "arm_shoulder_lift": Motor(2, "sts3215", norm_mode_body),
+                # "arm_elbow_flex": Motor(3, "sts3215", norm_mode_body),
+                # "arm_wrist_flex": Motor(4, "sts3215", norm_mode_body),
+                # "arm_wrist_roll": Motor(5, "sts3215", norm_mode_body),
+                # "arm_gripper": Motor(6, "sts3215", MotorNormMode.RANGE_0_100),
                 # base
                 "base_left_wheel": Motor(7, "sts3215", MotorNormMode.RANGE_M100_100),
                 "base_back_wheel": Motor(8, "sts3215", MotorNormMode.RANGE_M100_100),
@@ -69,20 +69,20 @@ class LeKiwi(Robot):
             },
             calibration=self.calibration,
         )
-        self.arm_motors = [motor for motor in self.bus.motors if motor.startswith("arm")]
+        # self.arm_motors = [motor for motor in self.bus.motors if motor.startswith("arm")]
         self.base_motors = [motor for motor in self.bus.motors if motor.startswith("base")]
-        self.cameras = make_cameras_from_configs(config.cameras)
+        # self.cameras = make_cameras_from_configs(config.cameras)
 
     @property
     def _state_ft(self) -> dict[str, type]:
         return dict.fromkeys(
             (
-                "arm_shoulder_pan.pos",
-                "arm_shoulder_lift.pos",
-                "arm_elbow_flex.pos",
-                "arm_wrist_flex.pos",
-                "arm_wrist_roll.pos",
-                "arm_gripper.pos",
+                # "arm_shoulder_pan.pos",
+                # "arm_shoulder_lift.pos",
+                # "arm_elbow_flex.pos",
+                # "arm_wrist_flex.pos",
+                # "arm_wrist_roll.pos",
+                # "arm_gripper.pos",
                 "x.vel",
                 "y.vel",
                 "theta.vel",
@@ -98,7 +98,8 @@ class LeKiwi(Robot):
 
     @cached_property
     def observation_features(self) -> dict[str, type | tuple]:
-        return {**self._state_ft, **self._cameras_ft}
+        # return {**self._state_ft, **self._cameras_ft}
+        return {**self._state_ft}
 
     @cached_property
     def action_features(self) -> dict[str, type]:
@@ -106,18 +107,19 @@ class LeKiwi(Robot):
 
     @property
     def is_connected(self) -> bool:
-        return self.bus.is_connected and all(cam.is_connected for cam in self.cameras.values())
+        # return self.bus.is_connected and all(cam.is_connected for cam in self.cameras.values())
+        return self.bus.is_connected
 
     def connect(self, calibrate: bool = True) -> None:
         if self.is_connected:
             raise DeviceAlreadyConnectedError(f"{self} already connected")
 
         self.bus.connect()
-        if not self.is_calibrated and calibrate:
-            self.calibrate()
+        # if not self.is_calibrated and calibrate:
+        #     self.calibrate()
 
-        for cam in self.cameras.values():
-            cam.connect()
+        # for cam in self.cameras.values():
+        #     cam.connect()
 
         self.configure()
         logger.info(f"{self} connected.")
@@ -174,13 +176,13 @@ class LeKiwi(Robot):
         # and torque can be safely disabled to run calibration.
         self.bus.disable_torque()
         self.bus.configure_motors()
-        for name in self.arm_motors:
-            self.bus.write("Operating_Mode", name, OperatingMode.POSITION.value)
-            # Set P_Coefficient to lower value to avoid shakiness (Default is 32)
-            self.bus.write("P_Coefficient", name, 16)
-            # Set I_Coefficient and D_Coefficient to default value 0 and 32
-            self.bus.write("I_Coefficient", name, 0)
-            self.bus.write("D_Coefficient", name, 32)
+        # for name in self.arm_motors:
+        #     self.bus.write("Operating_Mode", name, OperatingMode.POSITION.value)
+        #     # Set P_Coefficient to lower value to avoid shakiness (Default is 32)
+        #     self.bus.write("P_Coefficient", name, 16)
+        #     # Set I_Coefficient and D_Coefficient to default value 0 and 32
+        #     self.bus.write("I_Coefficient", name, 0)
+        #     self.bus.write("D_Coefficient", name, 32)
 
         for name in self.base_motors:
             self.bus.write("Operating_Mode", name, OperatingMode.VELOCITY.value)
@@ -332,7 +334,7 @@ class LeKiwi(Robot):
 
         # Read actuators position for arm and vel for base
         start = time.perf_counter()
-        arm_pos = self.bus.sync_read("Present_Position", self.arm_motors)
+        # arm_pos = self.bus.sync_read("Present_Position", self.arm_motors)
         base_wheel_vel = self.bus.sync_read("Present_Velocity", self.base_motors)
 
         base_vel = self._wheel_raw_to_body(
@@ -341,19 +343,20 @@ class LeKiwi(Robot):
             base_wheel_vel["base_right_wheel"],
         )
 
-        arm_state = {f"{k}.pos": v for k, v in arm_pos.items()}
+        # arm_state = {f"{k}.pos": v for k, v in arm_pos.items()}
 
-        obs_dict = {**arm_state, **base_vel}
+        # obs_dict = {**arm_state, **base_vel}
+        obs_dict = {**base_vel}
 
         dt_ms = (time.perf_counter() - start) * 1e3
         logger.debug(f"{self} read state: {dt_ms:.1f}ms")
 
         # Capture images from cameras
-        for cam_key, cam in self.cameras.items():
-            start = time.perf_counter()
-            obs_dict[cam_key] = cam.async_read()
-            dt_ms = (time.perf_counter() - start) * 1e3
-            logger.debug(f"{self} read {cam_key}: {dt_ms:.1f}ms")
+        # for cam_key, cam in self.cameras.items():
+        #     start = time.perf_counter()
+        #     obs_dict[cam_key] = cam.async_read()
+        #     dt_ms = (time.perf_counter() - start) * 1e3
+        #     logger.debug(f"{self} read {cam_key}: {dt_ms:.1f}ms")
 
         return obs_dict
 
@@ -373,7 +376,7 @@ class LeKiwi(Robot):
         if not self.is_connected:
             raise DeviceNotConnectedError(f"{self} is not connected.")
 
-        arm_goal_pos = {k: v for k, v in action.items() if k.endswith(".pos")}
+        # arm_goal_pos = {k: v for k, v in action.items() if k.endswith(".pos")}
         base_goal_vel = {k: v for k, v in action.items() if k.endswith(".vel")}
 
         base_wheel_goal_vel = self._body_to_wheel_raw(
@@ -382,18 +385,19 @@ class LeKiwi(Robot):
 
         # Cap goal position when too far away from present position.
         # /!\ Slower fps expected due to reading from the follower.
-        if self.config.max_relative_target is not None:
-            present_pos = self.bus.sync_read("Present_Position", self.arm_motors)
-            goal_present_pos = {key: (g_pos, present_pos[key]) for key, g_pos in arm_goal_pos.items()}
-            arm_safe_goal_pos = ensure_safe_goal_position(goal_present_pos, self.config.max_relative_target)
-            arm_goal_pos = arm_safe_goal_pos
+        # if self.config.max_relative_target is not None:
+        #     present_pos = self.bus.sync_read("Present_Position", self.arm_motors)
+        #     goal_present_pos = {key: (g_pos, present_pos[key]) for key, g_pos in arm_goal_pos.items()}
+        #     arm_safe_goal_pos = ensure_safe_goal_position(goal_present_pos, self.config.max_relative_target)
+        #     arm_goal_pos = arm_safe_goal_pos
 
         # Send goal position to the actuators
-        arm_goal_pos_raw = {k.replace(".pos", ""): v for k, v in arm_goal_pos.items()}
-        self.bus.sync_write("Goal_Position", arm_goal_pos_raw)
+        # arm_goal_pos_raw = {k.replace(".pos", ""): v for k, v in arm_goal_pos.items()}
+        # self.bus.sync_write("Goal_Position", arm_goal_pos_raw)
         self.bus.sync_write("Goal_Velocity", base_wheel_goal_vel)
 
-        return {**arm_goal_pos, **base_goal_vel}
+        # return {**arm_goal_pos, **base_goal_vel}
+        return {**base_goal_vel}
 
     def stop_base(self):
         self.bus.sync_write("Goal_Velocity", dict.fromkeys(self.base_motors, 0), num_retry=5)
@@ -405,7 +409,7 @@ class LeKiwi(Robot):
 
         self.stop_base()
         self.bus.disconnect(self.config.disable_torque_on_disconnect)
-        for cam in self.cameras.values():
-            cam.disconnect()
+        # for cam in self.cameras.values():
+        #     cam.disconnect()
 
         logger.info(f"{self} disconnected.")
