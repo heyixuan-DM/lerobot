@@ -2,7 +2,7 @@ from lerobot.common.robots.lekiwi import LeKiwiClient, LeKiwiClientConfig
 from lerobot.common.teleoperators.keyboard.teleop_keyboard import KeyboardTeleop, KeyboardTeleopConfig
 from lerobot.common.teleoperators.so100_leader import SO100Leader, SO100LeaderConfig
 
-robot_config = LeKiwiClientConfig(remote_ip="172.17.0.1", id="my_lekiwi")
+robot_config = LeKiwiClientConfig(remote_ip="192.168.17.102", id="my_lekiwi")
 
 # teleop__arm_config = SO100LeaderConfig(
 #     port="/dev/tty.usbmodem58760431551",
